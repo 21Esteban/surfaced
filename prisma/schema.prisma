@@ -1,0 +1,103 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
+// enough when changing adapters.
+// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+datasource db {
+  provider = "sqlite"
+  url      = "file:dev.sqlite"
+}
+
+model Session {
+  id            String    @id
+  shop          String
+  state         String
+  isOnline      Boolean   @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String
+  userId        BigInt?
+  firstName     String?
+  lastName      String?
+  email         String?
+  accountOwner  Boolean   @default(false)
+  locale        String?
+  collaborator  Boolean?  @default(false)
+  emailVerified Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+// ─── AI Visibility Tracker ────────────────────────────────────────────────
+// One row per installed store. Holds the merchant's brand + niche config.
+model Shop {
+  id           String   @id @default(cuid())
+  shopDomain   String   @unique
+  brandName    String? // how the brand is named in AI answers, e.g. "Acme Coffee"
+  niche        String? // e.g. "specialty coffee beans"
+  plan         String   @default("free") // free | starter | pro
+  createdAt    DateTime @default(now())
+
+  competitors  Competitor[]
+  keywords     Keyword[]
+  checks       VisibilityCheck[]
+  attributions OrderAttribution[]
+}
+
+// Competitor brand names we also look for in AI answers (for share-of-voice).
+model Competitor {
+  id     String @id @default(cuid())
+  shopId String
+  shop   Shop   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name   String
+}
+
+// A buyer-intent prompt we send to the AI engines, e.g.
+// "What are the best specialty coffee beans for espresso?"
+model Keyword {
+  id      String             @id @default(cuid())
+  shopId  String
+  shop    Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  prompt  String
+  results VisibilityResult[]
+}
+
+// One run of the worker: all keywords queried against one engine at one time.
+model VisibilityCheck {
+  id      String             @id @default(cuid())
+  shopId  String
+  shop    Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  engine  String // chatgpt | perplexity
+  score   Int? // 0-100 aggregate visibility score for this run
+  runAt   DateTime           @default(now())
+  results VisibilityResult[]
+}
+
+// Result for one keyword in one check: did the brand show up, and where.
+model VisibilityResult {
+  id          String          @id @default(cuid())
+  checkId     String
+  check       VisibilityCheck @relation(fields: [checkId], references: [id], onDelete: Cascade)
+  keywordId   String
+  keyword     Keyword         @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+  appeared    Boolean         @default(false) // was the brand mentioned?
+  position    Int? // rank among recommended products, null if absent
+  competitors String? // JSON array of competitor names found in the answer
+  rawResponse String? // the AI's answer text, kept for transparency
+}
+
+// A Shopify order we believe came from an AI engine (referrer match).
+model OrderAttribution {
+  id         String   @id @default(cuid())
+  shopId     String
+  shop       Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  orderId    String
+  source     String // chatgpt | perplexity | other
+  totalPrice Float    @default(0)
+  createdAt  DateTime @default(now())
+}
