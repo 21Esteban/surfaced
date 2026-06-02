@@ -25,8 +25,12 @@ export const loader = async ({ request }) => {
       competitors: true,
       keywords: true,
       checks: { orderBy: { runAt: "desc" }, take: 8 },
+      attributions: { orderBy: { createdAt: "desc" }, take: 100 },
     },
   });
+
+  const attributions = shop?.attributions ?? [];
+  const aiRevenue = attributions.reduce((sum, a) => sum + a.totalPrice, 0);
 
   return {
     shopDomain,
@@ -35,6 +39,8 @@ export const loader = async ({ request }) => {
     competitors: shop?.competitors.map((c) => c.name).join("\n") ?? "",
     keywords: shop?.keywords.map((k) => k.prompt).join("\n") ?? "",
     checks: shop?.checks ?? [],
+    aiOrders: attributions.length,
+    aiRevenue,
     configured: Boolean(shop?.brandName && shop?.keywords?.length),
   };
 };
@@ -180,6 +186,40 @@ export default function Index() {
             )}
           </s-stack>
         </s-stack>
+      </s-section>
+
+      {/* ── ROI: ventas atribuidas a IA ───────────────────────────────── */}
+      <s-section heading="Ventas atribuidas a IA">
+        <s-stack direction="inline" gap="large">
+          <s-box
+            padding="large"
+            borderWidth="base"
+            borderRadius="base"
+            background="subdued"
+          >
+            <s-stack direction="block" gap="none">
+              <s-text variant="headingLg">{data.aiOrders}</s-text>
+              <s-text tone="subdued">pedidos desde IA</s-text>
+            </s-stack>
+          </s-box>
+          <s-box
+            padding="large"
+            borderWidth="base"
+            borderRadius="base"
+            background="subdued"
+          >
+            <s-stack direction="block" gap="none">
+              <s-text variant="headingLg">
+                ${data.aiRevenue.toFixed(2)}
+              </s-text>
+              <s-text tone="subdued">ingresos desde IA</s-text>
+            </s-stack>
+          </s-box>
+        </s-stack>
+        <s-paragraph tone="subdued">
+          Pedidos cuyo origen (referrer) es ChatGPT, Perplexity, Gemini, Copilot
+          o Claude. Se registran automáticamente vía webhook al crearse la orden.
+        </s-paragraph>
       </s-section>
 
       {/* ── Configuración / onboarding ────────────────────────────────── */}
