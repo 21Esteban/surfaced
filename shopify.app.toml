@@ -3,7 +3,7 @@
 client_id = "933e74337a057b814f364b3603960dcc"
 application_url = "https://example.com"
 embedded = true
-name = "aio"
+name = "Surfaced"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
