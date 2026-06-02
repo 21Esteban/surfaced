@@ -4,7 +4,7 @@ client_id = "933e74337a057b814f364b3603960dcc"
 application_url = "https://example.com"
 embedded = true
 name = "Surfaced"
-handle = "surfaced"
+handle = "trysurfaced-ai"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
@@ -49,5 +49,4 @@ api_version = "2026-07"
 redirect_urls = [ "https://example.com/api/auth" ]
 
 [build]
-include_config_on_deploy = true
 automatically_update_urls_on_dev = true
