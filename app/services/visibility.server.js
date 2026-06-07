@@ -66,14 +66,47 @@ export function scoreFromResults(results) {
 }
 
 /**
+ * Build a realistic fake AI answer for demo mode (no API key / no cost).
+ * The brand shows up ~50% of the time at a random rank, so the resulting
+ * score and history look believable — handy for testing and for screenshots.
+ *
+ * @param {string} keyword
+ * @param {string} brandName
+ * @param {string[]} competitors
+ * @returns {string}
+ */
+export function generateDemoAnswer(keyword, brandName, competitors = []) {
+  const pool = [...competitors];
+  if (brandName && Math.random() < 0.5) pool.push(brandName);
+
+  // Shuffle so the brand's position varies run to run.
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+
+  const picks = pool.slice(0, Math.min(3, pool.length));
+  if (!picks.length) return `There are several options for "${keyword}".`;
+
+  const sentences = picks.map(
+    (name, i) =>
+      `${i === 0 ? "Top pick" : "Another option"}: ${name} is well-reviewed for this.`,
+  );
+  return `For "${keyword}", here are some recommendations. ${sentences.join(" ")}`;
+}
+
+/**
  * Run a full visibility check for one store on one engine:
  * query every keyword, detect mentions, persist a VisibilityCheck + results.
  *
  * @param {string} shopId
  * @param {"chatgpt"|"perplexity"} engine
+ * @param {{demo?: boolean}} [options]  demo=true uses simulated answers (no API key)
  * @returns {Promise<{checkId: string, score: number}>}
  */
-export async function runVisibilityCheck(shopId, engine) {
+export async function runVisibilityCheck(shopId, engine, options = {}) {
+  const { demo = false } = options;
+
   const shop = await prisma.shop.findUnique({
     where: { id: shopId },
     include: { keywords: true, competitors: true },
@@ -86,10 +119,14 @@ export async function runVisibilityCheck(shopId, engine) {
 
   for (const keyword of shop.keywords) {
     let answer = "";
-    try {
-      answer = await askEngine(engine, keyword.prompt);
-    } catch (err) {
-      console.error(`[visibility] ${engine} failed for "${keyword.prompt}":`, err.message);
+    if (demo) {
+      answer = generateDemoAnswer(keyword.prompt, shop.brandName, competitorNames);
+    } else {
+      try {
+        answer = await askEngine(engine, keyword.prompt);
+      } catch (err) {
+        console.error(`[visibility] ${engine} failed for "${keyword.prompt}":`, err.message);
+      }
     }
     const d = detectMentions(answer, shop.brandName, competitorNames);
     detections.push({ keyword, answer, ...d });
@@ -100,7 +137,7 @@ export async function runVisibilityCheck(shopId, engine) {
   const check = await prisma.visibilityCheck.create({
     data: {
       shopId,
-      engine,
+      engine: demo ? `${engine}-demo` : engine,
       score,
       results: {
         create: detections.map((d) => ({

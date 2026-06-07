@@ -80,15 +80,16 @@ export const action = async ({ request }) => {
     return { ok: true, saved: true };
   }
 
-  if (intent === "run") {
+  if (intent === "run" || intent === "demo") {
     const engine = (formData.get("engine") ?? "perplexity").toString();
+    const demo = intent === "demo";
     const shop = await prisma.shop.findUnique({ where: { shopDomain } });
     if (!shop?.brandName) {
       return { ok: false, error: "Configura tu marca y keywords primero." };
     }
     try {
-      const { score } = await runVisibilityCheck(shop.id, engine);
-      return { ok: true, ran: true, score, engine };
+      const { score } = await runVisibilityCheck(shop.id, engine, { demo });
+      return { ok: true, ran: true, score, engine, demo };
     } catch (err) {
       return { ok: false, error: err.message };
     }
@@ -117,11 +118,14 @@ export default function Index() {
   const submittingIntent = fetcher.formData?.get("intent");
   const saving = fetcher.state !== "idle" && submittingIntent === "save";
   const running = fetcher.state !== "idle" && submittingIntent === "run";
+  const demoing = fetcher.state !== "idle" && submittingIntent === "demo";
 
   useEffect(() => {
     if (fetcher.data?.saved) shopify.toast.show("Configuración guardada ✓");
     if (fetcher.data?.ran)
-      shopify.toast.show(`Análisis listo: ${fetcher.data.score}/100`);
+      shopify.toast.show(
+        `${fetcher.data.demo ? "Demo" : "Análisis"} listo: ${fetcher.data.score}/100`,
+      );
     if (fetcher.data?.error)
       shopify.toast.show(fetcher.data.error, { isError: true });
   }, [fetcher.data, shopify]);
@@ -133,6 +137,8 @@ export default function Index() {
     );
   const run = (engine) =>
     fetcher.submit({ intent: "run", engine }, { method: "POST" });
+  const runDemo = () =>
+    fetcher.submit({ intent: "demo", engine: "perplexity" }, { method: "POST" });
 
   const latest = data.checks[0];
   const latestScore = latest?.score ?? null;
@@ -184,6 +190,26 @@ export default function Index() {
                 motor {latest.engine}
               </s-text>
             )}
+            <s-stack direction="inline" gap="base">
+              <s-button
+                variant="primary"
+                onClick={() => run("perplexity")}
+                {...(running ? { loading: true } : {})}
+              >
+                Analizar ahora
+              </s-button>
+              <s-button
+                onClick={runDemo}
+                {...(demoing ? { loading: true } : {})}
+              >
+                Probar con datos demo
+              </s-button>
+            </s-stack>
+            <s-text tone="subdued">
+              “Analizar ahora” usa la API real (requiere API key). “Probar con
+              datos demo” genera un análisis simulado para que veas cómo
+              funciona — sin costo ni API key.
+            </s-text>
           </s-stack>
         </s-stack>
       </s-section>
