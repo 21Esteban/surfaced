@@ -133,7 +133,7 @@ export const loader = async ({ request }) => {
       checks: {
         orderBy: { runAt: "desc" },
         take: 12,
-        include: { results: true },
+        include: { results: { include: { keyword: true } } },
       },
       attributions: { orderBy: { createdAt: "desc" }, take: 100 },
     },
@@ -167,11 +167,24 @@ export const loader = async ({ request }) => {
     ].sort((a, b) => b.count - a.count);
   }
 
+  // Keywords where the brand showed up vs. where it didn't (= opportunities).
+  const coveredKeywords = [];
+  const missingKeywords = [];
+  if (latestCheck) {
+    for (const r of latestCheck.results) {
+      const prompt = r.keyword?.prompt;
+      if (!prompt) continue;
+      (r.appeared ? coveredKeywords : missingKeywords).push(prompt);
+    }
+  }
+
   const attributions = full?.attributions ?? [];
   const aiRevenue = attributions.reduce((sum, a) => sum + a.totalPrice, 0);
 
   return {
     shopDomain,
+    coveredKeywords,
+    missingKeywords,
     brandName: full?.brandName ?? "",
     niche: full?.niche ?? "",
     competitors: full?.competitors.map((c) => c.name).join("\n") ?? "",
@@ -300,6 +313,53 @@ function suggestKeywords(niche) {
   ];
 }
 
+// Actionable AEO advice, prioritized by how the store is doing.
+function improvementPlan(score) {
+  const base = [
+    {
+      title: "Enriquece tus descripciones de producto",
+      detail:
+        "Incluye los términos exactos que la gente le pregunta a la IA: para qué sirve, beneficios y “para [necesidad]”. La IA recomienda lo que entiende.",
+    },
+    {
+      title: "Consigue reseñas y menciones en otros sitios",
+      detail:
+        "La IA confía mucho en Reddit, blogs y YouTube. Pide reseñas y busca aparecer en listas tipo “mejores [tu producto]”.",
+    },
+    {
+      title: "Crea contenido que responda preguntas de compra",
+      detail:
+        "Publica en tu blog respuestas a “mejor X para Y”. Es justo lo que la IA cita al recomendar.",
+    },
+    {
+      title: "Revisa tus datos estructurados",
+      detail:
+        "Asegúrate de que tus productos tengan título, precio, marca y reseñas bien definidos (Shopify genera parte automáticamente).",
+    },
+  ];
+
+  if (score == null)
+    return { tone: "neutral", intro: "Corre un análisis para ver recomendaciones.", actions: [] };
+  if (score < 34)
+    return {
+      tone: "critical",
+      intro:
+        "La IA casi no te menciona. Lo prioritario es empezar a aparecer frente a tu competencia.",
+      actions: base,
+    };
+  if (score < 67)
+    return {
+      tone: "warning",
+      intro: "Vas por buen camino, pero puedes subir de posición.",
+      actions: base,
+    };
+  return {
+    tone: "success",
+    intro: "¡Buena visibilidad! Mantén el ritmo y vigila a tu competencia.",
+    actions: base.slice(0, 2),
+  };
+}
+
 /* eslint-disable react/prop-types */
 // Simple inline bar chart (no dependencies) for the score trend.
 function TrendChart({ points }) {
@@ -397,6 +457,7 @@ export default function Index() {
   const [niche, setNiche] = useState(data.niche);
   const [competitors, setCompetitors] = useState(data.competitors);
   const [keywords, setKeywords] = useState(data.keywords);
+  const [showSettings, setShowSettings] = useState(false);
 
   const submittingIntent = fetcher.formData?.get("intent");
   const saving = fetcher.state !== "idle" && submittingIntent === "save";
@@ -449,6 +510,7 @@ export default function Index() {
 
   const score = data.latestScore;
   const isDemo = (data.latestEngine ?? "").includes("demo") || !data.hasApiKey;
+  const plan = improvementPlan(score);
 
   return (
     <s-page heading="Surfaced — Visibilidad en IA">
@@ -519,6 +581,52 @@ export default function Index() {
         <ShareChart rows={data.shareOfVoice} />
       </s-section>
 
+      {/* ── Cómo mejorar ──────────────────────────────────────────────── */}
+      <s-section heading="Cómo mejorar tu visibilidad">
+        <s-stack direction="block" gap="base">
+          <s-badge tone={plan.tone}>{statusLabel(score)}</s-badge>
+          <s-paragraph>{plan.intro}</s-paragraph>
+
+          {data.missingKeywords.length > 0 && (
+            <s-box
+              padding="base"
+              borderWidth="base"
+              borderRadius="base"
+              background="subdued"
+            >
+              <s-stack direction="block" gap="tight">
+                <s-text fontWeight="bold">
+                  Búsquedas donde NO apareces (tus oportunidades):
+                </s-text>
+                <s-unordered-list>
+                  {data.missingKeywords.map((kw, i) => (
+                    <s-list-item key={i}>{kw}</s-list-item>
+                  ))}
+                </s-unordered-list>
+                <s-text tone="subdued">
+                  Enfoca contenido y reseñas en estas preguntas para empezar a
+                  aparecer.
+                </s-text>
+              </s-stack>
+            </s-box>
+          )}
+
+          {plan.actions.length > 0 && (
+            <s-stack direction="block" gap="base">
+              <s-text fontWeight="bold">Acciones recomendadas:</s-text>
+              {plan.actions.map((a, i) => (
+                <s-stack key={i} direction="block" gap="none">
+                  <s-text fontWeight="bold">
+                    {i + 1}. {a.title}
+                  </s-text>
+                  <s-text tone="subdued">{a.detail}</s-text>
+                </s-stack>
+              ))}
+            </s-stack>
+          )}
+        </s-stack>
+      </s-section>
+
       {/* ── ROI ───────────────────────────────────────────────────────── */}
       <s-section heading="Ventas atribuidas a IA">
         <s-stack direction="inline" gap="large">
@@ -537,48 +645,54 @@ export default function Index() {
         </s-stack>
       </s-section>
 
-      {/* ── Ajustes (opcional) ────────────────────────────────────────── */}
+      {/* ── Ajustes (opcional, colapsado) ─────────────────────────────── */}
       <s-section heading="Ajustes (opcional)">
         <s-paragraph tone="subdued">
-          Configuramos esto automáticamente desde tu tienda. Solo cámbialo si
+          Configuramos esto automáticamente desde tu tienda. Ábrelo solo si
           quieres afinar la marca, el nicho, los competidores o las keywords.
         </s-paragraph>
-        <s-stack direction="block" gap="base">
-          <s-button onClick={autofill} {...(autofilling ? { loading: true } : {})}>
-            Volver a autocompletar desde mi tienda
-          </s-button>
-          <s-text-field
-            label="Nombre de tu marca"
-            value={brandName}
-            onChange={(e) => setBrandName(e.target.value)}
-          />
-          <s-text-field
-            label="Nicho"
-            value={niche}
-            onChange={(e) => setNiche(e.target.value)}
-          />
-          <s-text-area
-            label="Competidores (una marca por línea)"
-            value={competitors}
-            onChange={(e) => setCompetitors(e.target.value)}
-          />
-          <s-text-area
-            label="Keywords (una pregunta por línea)"
-            value={keywords}
-            onChange={(e) => setKeywords(e.target.value)}
-          />
-          <s-stack direction="inline" gap="base">
-            <s-button
-              onClick={() => setKeywords(suggestKeywords(niche).join("\n"))}
-              {...(niche.trim() ? {} : { disabled: true })}
-            >
-              Sugerir keywords
+        <s-button onClick={() => setShowSettings((v) => !v)}>
+          {showSettings ? "Ocultar configuración" : "Editar configuración"}
+        </s-button>
+
+        {showSettings && (
+          <s-stack direction="block" gap="base">
+            <s-button onClick={autofill} {...(autofilling ? { loading: true } : {})}>
+              Volver a autocompletar desde mi tienda
             </s-button>
-            <s-button variant="primary" onClick={save} {...(saving ? { loading: true } : {})}>
-              Guardar
-            </s-button>
+            <s-text-field
+              label="Nombre de tu marca"
+              value={brandName}
+              onChange={(e) => setBrandName(e.target.value)}
+            />
+            <s-text-field
+              label="Nicho"
+              value={niche}
+              onChange={(e) => setNiche(e.target.value)}
+            />
+            <s-text-area
+              label="Competidores (una marca por línea)"
+              value={competitors}
+              onChange={(e) => setCompetitors(e.target.value)}
+            />
+            <s-text-area
+              label="Keywords (una pregunta por línea)"
+              value={keywords}
+              onChange={(e) => setKeywords(e.target.value)}
+            />
+            <s-stack direction="inline" gap="base">
+              <s-button
+                onClick={() => setKeywords(suggestKeywords(niche).join("\n"))}
+                {...(niche.trim() ? {} : { disabled: true })}
+              >
+                Sugerir keywords
+              </s-button>
+              <s-button variant="primary" onClick={save} {...(saving ? { loading: true } : {})}>
+                Guardar
+              </s-button>
+            </s-stack>
           </s-stack>
-        </s-stack>
+        )}
       </s-section>
 
       {/* ── Histórico ─────────────────────────────────────────────────── */}
