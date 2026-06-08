@@ -10,6 +10,38 @@
 
 const PERPLEXITY_MODEL = process.env.PERPLEXITY_MODEL ?? "sonar";
 const OPENAI_MODEL = process.env.OPENAI_MODEL ?? "gpt-4o";
+const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL ?? "deepseek-chat";
+
+/**
+ * Ask DeepSeek a buyer-intent question and return the answer text.
+ * NOTE: DeepSeek's API answers from its training knowledge (no live web
+ * search), so this measures "brand presence in the model" rather than live
+ * AI-search visibility. Cheap/free, good for getting real data to start.
+ * @param {string} prompt
+ * @returns {Promise<string>}
+ */
+async function askDeepSeek(prompt) {
+  const key = process.env.DEEPSEEK_API_KEY;
+  if (!key) throw new Error("DEEPSEEK_API_KEY is not set");
+
+  const res = await fetch("https://api.deepseek.com/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: DEEPSEEK_MODEL,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`DeepSeek ${res.status}: ${await res.text()}`);
+  }
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content ?? "";
+}
 
 /**
  * Ask Perplexity a buyer-intent question and return the answer text.
@@ -76,14 +108,26 @@ async function askChatGPT(prompt) {
 
 /**
  * Query an engine by name.
- * @param {"chatgpt"|"perplexity"} engine
+ * @param {"chatgpt"|"perplexity"|"deepseek"} engine
  * @param {string} prompt
  * @returns {Promise<string>}
  */
 export async function askEngine(engine, prompt) {
   if (engine === "perplexity") return askPerplexity(prompt);
   if (engine === "chatgpt") return askChatGPT(prompt);
+  if (engine === "deepseek") return askDeepSeek(prompt);
   throw new Error(`Unknown engine: ${engine}`);
 }
 
-export const SUPPORTED_ENGINES = ["perplexity", "chatgpt"];
+export const SUPPORTED_ENGINES = ["perplexity", "chatgpt", "deepseek"];
+
+// Pick a real engine based on which API key is configured (DeepSeek first
+// since it's the cheapest to start with).
+export function defaultEngine() {
+  const env = process.env;
+  if (env.DEEPSEEK_API_KEY) return "deepseek";
+  if (env.PERPLEXITY_API_KEY && !env.PERPLEXITY_API_KEY.includes("REEMPLAZA"))
+    return "perplexity";
+  if (env.OPENAI_API_KEY) return "chatgpt";
+  return "perplexity";
+}

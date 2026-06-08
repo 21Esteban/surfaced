@@ -5,6 +5,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server.js";
 import { runVisibilityCheck } from "../services/visibility.server.js";
+import { defaultEngine } from "../services/ai-engines.server.js";
 
 // ── server helpers ─────────────────────────────────────────────────────────
 
@@ -98,8 +99,12 @@ async function seedDemoConfig(shopDomain) {
 
 function hasRealApiKey() {
   // eslint-disable-next-line no-undef
-  const k = process.env.PERPLEXITY_API_KEY || process.env.OPENAI_API_KEY || "";
-  return Boolean(k && !k.includes("REEMPLAZA"));
+  const env = process.env;
+  return Boolean(
+    env.DEEPSEEK_API_KEY ||
+      (env.PERPLEXITY_API_KEY && !env.PERPLEXITY_API_KEY.includes("REEMPLAZA")) ||
+      env.OPENAI_API_KEY,
+  );
 }
 
 // ── loader ──────────────────────────────────────────────────────────────────
@@ -202,6 +207,7 @@ export const loader = async ({ request }) => {
     aiOrders: attributions.length,
     aiRevenue,
     hasApiKey: hasRealApiKey(),
+    engine: defaultEngine(),
     configured: Boolean(full?.brandName && full?.keywords?.length),
   };
 };
@@ -474,9 +480,9 @@ export default function Index() {
     if (data.checksCount === 0 && fetcher.state === "idle") {
       autoRan.current = true;
       const intent = data.hasApiKey && data.configured ? "run" : "demo";
-      fetcher.submit({ intent, engine: "perplexity" }, { method: "POST" });
+      fetcher.submit({ intent, engine: data.engine }, { method: "POST" });
     }
-  }, [data.checksCount, data.hasApiKey, data.configured, fetcher]);
+  }, [data.checksCount, data.hasApiKey, data.configured, data.engine, fetcher]);
 
   useEffect(() => {
     if (fetcher.data?.saved) shopify.toast.show("Guardado ✓");
@@ -498,7 +504,10 @@ export default function Index() {
 
   const analyze = () =>
     fetcher.submit(
-      { intent: data.hasApiKey && data.configured ? "run" : "demo", engine: "perplexity" },
+      {
+        intent: data.hasApiKey && data.configured ? "run" : "demo",
+        engine: data.engine,
+      },
       { method: "POST" },
     );
   const save = () =>
@@ -561,7 +570,14 @@ export default function Index() {
             </s-paragraph>
             {data.latestRunAt && (
               <s-text tone="subdued">
-                Último análisis: {new Date(data.latestRunAt).toLocaleString()}
+                Último análisis: {new Date(data.latestRunAt).toLocaleString()} ·
+                motor {data.latestEngine}
+              </s-text>
+            )}
+            {data.latestEngine === "deepseek" && (
+              <s-text tone="subdued">
+                DeepSeek responde desde su conocimiento (sin búsqueda web en
+                vivo). Suma Perplexity para medir la búsqueda en tiempo real.
               </s-text>
             )}
           </s-stack>
