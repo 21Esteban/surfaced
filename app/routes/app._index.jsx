@@ -15,6 +15,40 @@ function parseLines(value) {
     .filter(Boolean);
 }
 
+// Sample config so "Probar con datos demo" works in one click on a fresh store.
+const DEMO_CONFIG = {
+  brandName: "Terranova Wellness",
+  niche: "magnesium supplements",
+  competitors: ["Ritual", "AG1", "Thorne"],
+  keywords: [
+    "best magnesium supplements",
+    "best magnesium for sleep",
+    "best supplements for women",
+    "top rated supplement brands",
+  ],
+};
+
+async function seedDemoConfig(shopDomain) {
+  const shop = await prisma.shop.upsert({
+    where: { shopDomain },
+    update: { brandName: DEMO_CONFIG.brandName, niche: DEMO_CONFIG.niche },
+    create: {
+      shopDomain,
+      brandName: DEMO_CONFIG.brandName,
+      niche: DEMO_CONFIG.niche,
+    },
+  });
+  await prisma.competitor.deleteMany({ where: { shopId: shop.id } });
+  await prisma.keyword.deleteMany({ where: { shopId: shop.id } });
+  await prisma.competitor.createMany({
+    data: DEMO_CONFIG.competitors.map((name) => ({ shopId: shop.id, name })),
+  });
+  await prisma.keyword.createMany({
+    data: DEMO_CONFIG.keywords.map((prompt) => ({ shopId: shop.id, prompt })),
+  });
+  return shop;
+}
+
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const shopDomain = session.shop;
@@ -83,13 +117,29 @@ export const action = async ({ request }) => {
   if (intent === "run" || intent === "demo") {
     const engine = (formData.get("engine") ?? "perplexity").toString();
     const demo = intent === "demo";
-    const shop = await prisma.shop.findUnique({ where: { shopDomain } });
-    if (!shop?.brandName) {
-      return { ok: false, error: "Configura tu marca y keywords primero." };
+    let shop = await prisma.shop.findUnique({
+      where: { shopDomain },
+      include: { keywords: true },
+    });
+
+    const needsConfig = !shop?.brandName || !shop?.keywords?.length;
+
+    if (needsConfig) {
+      if (demo) {
+        // One-click demo: seed sample data so it always works on a fresh store.
+        shop = await seedDemoConfig(shopDomain);
+      } else {
+        return {
+          ok: false,
+          error:
+            "Configura tu marca y keywords primero (o usa “Probar con datos demo”).",
+        };
+      }
     }
+
     try {
       const { score } = await runVisibilityCheck(shop.id, engine, { demo });
-      return { ok: true, ran: true, score, engine, demo };
+      return { ok: true, ran: true, score, engine, demo, seeded: needsConfig && demo };
     } catch (err) {
       return { ok: false, error: err.message };
     }
@@ -139,11 +189,20 @@ export default function Index() {
     if (fetcher.data?.saved) shopify.toast.show("Configuración guardada ✓");
     if (fetcher.data?.ran)
       shopify.toast.show(
-        `${fetcher.data.demo ? "Demo" : "Análisis"} listo: ${fetcher.data.score}/100`,
+        `${fetcher.data.seeded ? "Datos de ejemplo cargados — demo" : fetcher.data.demo ? "Demo" : "Análisis"} listo: ${fetcher.data.score}/100`,
       );
     if (fetcher.data?.error)
       shopify.toast.show(fetcher.data.error, { isError: true });
   }, [fetcher.data, shopify]);
+
+  // Keep the form in sync when the saved config changes (e.g. after a
+  // one-click demo seeds sample data, the fields fill in automatically).
+  useEffect(() => {
+    setBrandName(data.brandName);
+    setNiche(data.niche);
+    setCompetitors(data.competitors);
+    setKeywords(data.keywords);
+  }, [data.brandName, data.niche, data.competitors, data.keywords]);
 
   const save = () =>
     fetcher.submit(
