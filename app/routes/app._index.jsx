@@ -80,10 +80,55 @@ export const loader = async ({ request }) => {
 };
 
 export const action = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   const shopDomain = session.shop;
   const formData = await request.formData();
   const intent = formData.get("intent");
+
+  // Auto-fill brand, niche and keywords by reading the merchant's own store —
+  // so they don't have to figure out what to type.
+  if (intent === "autofill") {
+    const resp = await admin.graphql(`#graphql
+      query {
+        shop { name }
+        products(first: 50) { edges { node { productType } } }
+      }`);
+    const json = await resp.json();
+
+    const brandName = (json.data?.shop?.name ?? "").trim();
+    const types = (json.data?.products?.edges ?? [])
+      .map((e) => (e.node?.productType ?? "").trim())
+      .filter(Boolean);
+
+    // Most common product type = the niche.
+    const freq = {};
+    for (const t of types) freq[t] = (freq[t] ?? 0) + 1;
+    const sortedTypes = Object.keys(freq).sort((a, b) => freq[b] - freq[a]);
+    const niche = sortedTypes[0] ?? "";
+
+    // Keywords from the top product types.
+    const kw = [
+      ...sortedTypes.slice(0, 3).map((t) => `best ${t.toLowerCase()}`),
+      ...(niche
+        ? [`top rated ${niche.toLowerCase()} brands`, `best ${niche.toLowerCase()} 2026`]
+        : []),
+    ];
+    const keywordsArr = [...new Set(kw)].slice(0, 6);
+
+    const shop = await prisma.shop.upsert({
+      where: { shopDomain },
+      update: { brandName, niche },
+      create: { shopDomain, brandName, niche },
+    });
+    await prisma.keyword.deleteMany({ where: { shopId: shop.id } });
+    if (keywordsArr.length) {
+      await prisma.keyword.createMany({
+        data: keywordsArr.map((prompt) => ({ shopId: shop.id, prompt })),
+      });
+    }
+
+    return { ok: true, autofill: true, foundProducts: types.length };
+  }
 
   if (intent === "save") {
     const brandName = (formData.get("brandName") ?? "").toString().trim();
@@ -184,12 +229,19 @@ export default function Index() {
   const saving = fetcher.state !== "idle" && submittingIntent === "save";
   const running = fetcher.state !== "idle" && submittingIntent === "run";
   const demoing = fetcher.state !== "idle" && submittingIntent === "demo";
+  const autofilling = fetcher.state !== "idle" && submittingIntent === "autofill";
 
   useEffect(() => {
     if (fetcher.data?.saved) shopify.toast.show("Configuración guardada ✓");
     if (fetcher.data?.ran)
       shopify.toast.show(
         `${fetcher.data.seeded ? "Datos de ejemplo cargados — demo" : fetcher.data.demo ? "Demo" : "Análisis"} listo: ${fetcher.data.score}/100`,
+      );
+    if (fetcher.data?.autofill)
+      shopify.toast.show(
+        fetcher.data.foundProducts > 0
+          ? "Autocompletado desde tu tienda ✓"
+          : "Marca cargada. Agrega tu nicho y pulsa “Sugerir keywords”.",
       );
     if (fetcher.data?.error)
       shopify.toast.show(fetcher.data.error, { isError: true });
@@ -213,6 +265,8 @@ export default function Index() {
     fetcher.submit({ intent: "run", engine }, { method: "POST" });
   const runDemo = () =>
     fetcher.submit({ intent: "demo", engine: "perplexity" }, { method: "POST" });
+  const autofill = () =>
+    fetcher.submit({ intent: "autofill" }, { method: "POST" });
 
   const latest = data.checks[0];
   const latestScore = latest?.score ?? null;
@@ -325,6 +379,27 @@ export default function Index() {
       {/* ── Configuración / onboarding ────────────────────────────────── */}
       <s-section heading="Configuración">
         <s-stack direction="block" gap="base">
+          <s-box
+            padding="base"
+            borderWidth="base"
+            borderRadius="base"
+            background="subdued"
+          >
+            <s-stack direction="block" gap="tight">
+              <s-text variant="headingSm">¿No quieres llenar esto a mano?</s-text>
+              <s-paragraph tone="subdued">
+                Leemos tu tienda y completamos tu marca, nicho y keywords
+                automáticamente. Luego solo revisas y guardas.
+              </s-paragraph>
+              <s-button
+                variant="primary"
+                onClick={autofill}
+                {...(autofilling ? { loading: true } : {})}
+              >
+                Autocompletar desde mi tienda
+              </s-button>
+            </s-stack>
+          </s-box>
           <s-text-field
             label="Nombre de tu marca"
             details="Como aparece en respuestas de IA, ej. “Acme Coffee”"
