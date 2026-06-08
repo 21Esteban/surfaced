@@ -122,8 +122,11 @@ export async function runVisibilityCheck(shopId, engine, options = {}) {
     if (demo) {
       answer = generateDemoAnswer(keyword.prompt, shop.brandName, competitorNames);
     } else {
+      // Nudge the model to name specific brands, otherwise some engines answer
+      // with product types/criteria instead of brand names.
+      const enginePrompt = `${keyword.prompt}\n\nRecommend specific brands by name. List the brand names you would recommend.`;
       try {
-        answer = await askEngine(engine, keyword.prompt);
+        answer = await askEngine(engine, enginePrompt);
       } catch (err) {
         console.error(`[visibility] ${engine} failed for "${keyword.prompt}":`, err.message);
       }

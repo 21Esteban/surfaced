@@ -38,9 +38,12 @@ async function deriveStoreConfig(admin) {
   const niche = sortedTypes[0] ?? "";
 
   const kw = [
-    ...sortedTypes.slice(0, 3).map((t) => `best ${t.toLowerCase()}`),
+    ...sortedTypes.slice(0, 3).map((t) => `what are the best ${t.toLowerCase()} brands`),
     ...(niche
-      ? [`top rated ${niche.toLowerCase()} brands`, `best ${niche.toLowerCase()} 2026`]
+      ? [
+          `recommend specific ${niche.toLowerCase()} brands`,
+          `top rated ${niche.toLowerCase()} brands to buy`,
+        ]
       : []),
   ];
   const keywords = [...new Set(kw)].slice(0, 6);
@@ -69,10 +72,10 @@ const DEMO_CONFIG = {
   niche: "magnesium supplements",
   competitors: ["Ritual", "AG1", "Thorne"],
   keywords: [
-    "best magnesium supplements",
-    "best magnesium for sleep",
-    "best supplements for women",
-    "top rated supplement brands",
+    "what are the best magnesium supplement brands",
+    "best magnesium supplement brands for sleep",
+    "recommend specific supplement brands for women",
+    "top rated supplement brands to buy",
   ],
 };
 
@@ -311,11 +314,11 @@ function suggestKeywords(niche) {
   const n = (niche ?? "").trim();
   if (!n) return [];
   return [
-    `best ${n}`,
-    `best ${n} for beginners`,
-    `top rated ${n} brands`,
-    `best ${n} 2026`,
-    `best affordable ${n}`,
+    `what are the best ${n} brands`,
+    `recommend specific ${n} brands`,
+    `top rated ${n} brands to buy`,
+    `best ${n} brands 2026`,
+    `best ${n} brands for the money`,
   ];
 }
 
