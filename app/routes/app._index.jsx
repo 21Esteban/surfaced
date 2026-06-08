@@ -105,6 +105,21 @@ function scoreTone(score) {
   return "critical";
 }
 
+// Generate typical buyer-intent prompts from the merchant's niche, so a
+// merchant who doesn't know what to track gets a useful starting point.
+// English templates because that's where AI shopping is most active.
+function suggestKeywords(niche) {
+  const n = (niche ?? "").trim();
+  if (!n) return [];
+  return [
+    `best ${n}`,
+    `best ${n} for beginners`,
+    `top rated ${n} brands`,
+    `best ${n} 2026`,
+    `best affordable ${n}`,
+  ];
+}
+
 export default function Index() {
   const data = useLoaderData();
   const fetcher = useFetcher();
@@ -264,17 +279,25 @@ export default function Index() {
             onChange={(e) => setNiche(e.target.value)}
           />
           <s-text-area
-            label="Competidores (uno por línea)"
-            details="Marcas con las que compites por la recomendación de la IA"
+            label="Competidores"
+            details="Una marca por línea (presiona Enter entre cada una). Si no sabes cuáles, déjalo vacío: al correr un análisis la IA te mostrará marcas que puedes agregar."
             value={competitors}
             onChange={(e) => setCompetitors(e.target.value)}
           />
           <s-text-area
-            label="Keywords / preguntas de compra (una por línea)"
-            details="Ej. “mejores granos de café para espresso”"
+            label="Keywords / preguntas de compra"
+            details="Una pregunta por línea (presiona Enter entre cada una). Ej. “best magnesium for sleep”."
             value={keywords}
             onChange={(e) => setKeywords(e.target.value)}
           />
+          <s-stack direction="inline" gap="base">
+            <s-button
+              onClick={() => setKeywords(suggestKeywords(niche).join("\n"))}
+              {...(niche.trim() ? {} : { disabled: true })}
+            >
+              Sugerir keywords desde mi nicho
+            </s-button>
+          </s-stack>
           <s-stack direction="inline" gap="base">
             <s-button
               variant="primary"
