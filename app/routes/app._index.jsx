@@ -370,52 +370,94 @@ function improvementPlan(score) {
 }
 
 /* eslint-disable react/prop-types */
-// Simple inline bar chart (no dependencies) for the score trend.
-function TrendChart({ points }) {
-  if (!points.length) {
-    return <s-paragraph tone="subdued">Aún no hay análisis.</s-paragraph>;
-  }
-  const w = 520;
-  const h = 180;
-  const pad = 28;
-  const n = points.length;
-  const slot = (w - pad * 2) / n;
-  const barW = Math.min(48, slot * 0.6);
+
+// Circular gauge for the visibility score — the hero visual.
+function ScoreGauge({ score }) {
+  const size = 184;
+  const stroke = 18;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const pct = Math.max(0, Math.min(100, score ?? 0)) / 100;
+  const color = score == null ? "#C9CCCF" : scoreColor(score);
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} style={{ width: "100%", maxWidth: w }}>
-      <line x1={pad} y1={h - pad} x2={w - pad} y2={h - pad} stroke="#dde" />
-      {points.map((p, i) => {
-        const barH = (p.score / 100) * (h - pad * 2);
-        const x = pad + i * slot + (slot - barW) / 2;
-        const y = h - pad - barH;
-        return (
-          <g key={i}>
-            <rect
-              x={x}
-              y={y}
-              width={barW}
-              height={Math.max(barH, 2)}
-              rx="4"
-              fill={scoreColor(p.score)}
-            />
-            <text
-              x={x + barW / 2}
-              y={y - 5}
-              fontSize="12"
-              textAnchor="middle"
-              fill="#444"
-            >
-              {p.score}
-            </text>
-          </g>
-        );
-      })}
+    <svg
+      viewBox={`0 0 ${size} ${size}`}
+      style={{ width: 184, maxWidth: "100%" }}
+      role="img"
+    >
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke="#EEF0F2"
+        strokeWidth={stroke}
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke={color}
+        strokeWidth={stroke}
+        strokeLinecap="round"
+        strokeDasharray={`${c * pct} ${c}`}
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+      />
+      <text
+        x="50%"
+        y="49%"
+        textAnchor="middle"
+        fontSize="48"
+        fontWeight="700"
+        fill="#1f2125"
+      >
+        {score != null ? score : "—"}
+      </text>
+      <text x="50%" y="64%" textAnchor="middle" fontSize="14" fill="#6D7175">
+        de 100
+      </text>
     </svg>
   );
 }
 
-// Horizontal bars for share of voice (you vs competitors).
+// Smooth area + line chart for the score trend over time.
+function TrendChart({ points }) {
+  if (!points.length) {
+    return <s-paragraph tone="subdued">Aún no hay análisis.</s-paragraph>;
+  }
+  const w = 560;
+  const h = 200;
+  const padX = 14;
+  const padY = 22;
+  const n = points.length;
+  const x = (i) => (n === 1 ? w / 2 : padX + (i * (w - 2 * padX)) / (n - 1));
+  const y = (v) => h - padY - (v / 100) * (h - 2 * padY);
+
+  const line = points.map((p, i) => `${x(i)},${y(p.score)}`).join(" ");
+  const area = `${x(0)},${h - padY} ${line} ${x(n - 1)},${h - padY}`;
+
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} style={{ width: "100%", maxWidth: w }}>
+      {[0, 25, 50, 75, 100].map((g) => (
+        <g key={g}>
+          <line x1={padX} x2={w - padX} y1={y(g)} y2={y(g)} stroke="#EEF0F2" />
+          <text x={0} y={y(g) + 4} fontSize="10" fill="#9aa0a6">
+            {g}
+          </text>
+        </g>
+      ))}
+      <polygon points={area} fill="rgba(0,127,95,0.10)" />
+      <polyline points={line} fill="none" stroke="#007F5F" strokeWidth="2.5" />
+      {points.map((p, i) => (
+        <circle key={i} cx={x(i)} cy={y(p.score)} r="3.5" fill="#007F5F" />
+      ))}
+    </svg>
+  );
+}
+
+// Polished horizontal bars for share of voice (you vs competitors).
 function ShareChart({ rows }) {
   if (!rows.length) {
     return (
@@ -428,28 +470,31 @@ function ShareChart({ rows }) {
   return (
     <s-stack direction="block" gap="base">
       {rows.map((r, i) => (
-        <s-stack key={i} direction="block" gap="none">
-          <s-text>
-            {r.isBrand ? `★ ${r.name} (tú)` : r.name} — {r.count}
-          </s-text>
+        <div key={i}>
           <div
             style={{
-              background: "#eef0f2",
-              borderRadius: 6,
-              height: 16,
-              width: "100%",
+              display: "flex",
+              justifyContent: "space-between",
+              marginBottom: 4,
             }}
           >
+            <span style={{ fontWeight: r.isBrand ? 700 : 400 }}>
+              {r.isBrand ? `★ ${r.name} (tú)` : r.name}
+            </span>
+            <span style={{ color: "#6D7175" }}>{r.count}</span>
+          </div>
+          <div style={{ background: "#EEF0F2", borderRadius: 8, height: 16 }}>
             <div
               style={{
                 width: `${(r.count / max) * 100}%`,
-                background: r.isBrand ? "#1a7f37" : "#9aa0a6",
+                minWidth: r.count > 0 ? 10 : 0,
+                background: r.isBrand ? "#007F5F" : "#C9CCCF",
                 height: 16,
-                borderRadius: 6,
+                borderRadius: 8,
               }}
             />
           </div>
-        </s-stack>
+        </div>
       ))}
     </s-stack>
   );
@@ -523,6 +568,13 @@ export default function Index() {
   const score = data.latestScore;
   const isDemo = (data.latestEngine ?? "").includes("demo") || !data.hasApiKey;
   const plan = improvementPlan(score);
+  const covered = data.coveredKeywords.length;
+  const totalKw = covered + data.missingKeywords.length;
+  const delta =
+    data.trend.length >= 2
+      ? data.trend[data.trend.length - 1].score -
+        data.trend[data.trend.length - 2].score
+      : null;
 
   return (
     <s-page heading="Surfaced — Visibilidad en IA">
@@ -551,26 +603,33 @@ export default function Index() {
         </s-section>
       )}
 
-      {/* ── Score principal ───────────────────────────────────────────── */}
+      {/* ── Hero: medidor + resumen ───────────────────────────────────── */}
       <s-section heading={`Visibilidad de ${data.brandName || "tu tienda"} en la IA`}>
         <s-stack direction="inline" gap="large" alignItems="center">
-          <s-box
-            padding="large"
-            borderWidth="base"
-            borderRadius="base"
-            background="subdued"
-          >
-            <s-stack direction="block" gap="none" alignItems="center">
-              <s-text variant="headingXl">{score != null ? `${score}` : "—"}</s-text>
-              <s-text tone="subdued">/ 100</s-text>
+          <ScoreGauge score={score} />
+          <s-stack direction="block" gap="base">
+            <s-stack direction="inline" gap="tight" alignItems="center">
+              <s-badge tone={scoreTone(score)}>{statusLabel(score)}</s-badge>
+              {delta != null && (
+                <s-text tone={delta >= 0 ? "success" : "critical"}>
+                  {delta >= 0 ? "▲" : "▼"} {Math.abs(delta)} vs. análisis anterior
+                </s-text>
+              )}
             </s-stack>
-          </s-box>
-          <s-stack direction="block" gap="tight">
-            <s-badge tone={scoreTone(score)}>{statusLabel(score)}</s-badge>
-            <s-paragraph>
-              Mide qué tan seguido la IA (ChatGPT, Perplexity…) recomienda tu
-              tienda cuando alguien busca productos como los tuyos.
-            </s-paragraph>
+            {totalKw > 0 ? (
+              <s-paragraph>
+                La IA te recomienda en{" "}
+                <s-text fontWeight="bold">
+                  {covered} de {totalKw}
+                </s-text>{" "}
+                búsquedas de tu nicho.
+              </s-paragraph>
+            ) : (
+              <s-paragraph>
+                Mide qué tan seguido la IA recomienda tu tienda cuando alguien
+                busca productos como los tuyos.
+              </s-paragraph>
+            )}
             {data.latestRunAt && (
               <s-text tone="subdued">
                 Último análisis: {new Date(data.latestRunAt).toLocaleString()} ·
@@ -591,7 +650,8 @@ export default function Index() {
       <s-section heading="Tendencia de tu visibilidad">
         <TrendChart points={data.trend} />
         <s-text tone="subdued">
-          Cada barra es un análisis. Sube cuando la IA te recomienda más.
+          Cada punto es un análisis. La línea sube cuando la IA te recomienda
+          más seguido.
         </s-text>
       </s-section>
 
