@@ -595,8 +595,8 @@ export default function Index() {
             background="subdued"
           >
             <s-text tone="subdued">
-              🧪 You're viewing <s-text fontWeight="bold">sample data</s-text>.
-              Connect an API key to measure your real visibility in AI.
+              🧪 Showing <s-text fontWeight="bold">sample data</s-text>. Connect
+              an API key to measure your real visibility in AI.
             </s-text>
           </s-box>
         </s-section>
@@ -674,7 +674,7 @@ export default function Index() {
             >
               <s-stack direction="block" gap="tight">
                 <s-text fontWeight="bold">
-                  Searches where you DON'T appear (your opportunities):
+                  Searches where you do not appear (your opportunities):
                 </s-text>
                 <s-unordered-list>
                   {data.missingKeywords.map((kw, i) => (
