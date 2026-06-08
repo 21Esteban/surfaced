@@ -166,7 +166,7 @@ export const loader = async ({ request }) => {
       for (const name of arr) if (name in compCounts) compCounts[name] += 1;
     }
     shareOfVoice = [
-      { name: full.brandName || "Tu marca", count: brandCount, isBrand: true },
+      { name: full.brandName || "Your brand", count: brandCount, isBrand: true },
       ...Object.entries(compCounts).map(([name, count]) => ({
         name,
         count,
@@ -228,7 +228,7 @@ export const action = async ({ request }) => {
     try {
       cfg = await deriveStoreConfig(admin);
     } catch (err) {
-      return { ok: false, error: `No pude leer tu tienda: ${err.message}` };
+      return { ok: false, error: `Couldn't read your store: ${err.message}` };
     }
     await applyConfig(shopDomain, cfg);
     return { ok: true, autofill: true, foundProducts: cfg.foundProducts };
@@ -273,7 +273,7 @@ export const action = async ({ request }) => {
       if (demo) {
         shop = await seedDemoConfig(shopDomain);
       } else {
-        return { ok: false, error: "Configura tu marca y keywords primero." };
+        return { ok: false, error: "Set up your brand and keywords first." };
       }
     }
 
@@ -285,7 +285,7 @@ export const action = async ({ request }) => {
     }
   }
 
-  return { ok: false, error: "Acción desconocida" };
+  return { ok: false, error: "Unknown action" };
 };
 
 // ── client helpers ───────────────────────────────────────────────────────────
@@ -304,10 +304,10 @@ function scoreColor(score) {
 }
 
 function statusLabel(score) {
-  if (score == null) return "Sin medir todavía";
-  if (score >= 67) return "Buena visibilidad";
-  if (score >= 34) return "Visibilidad media";
-  return "Visibilidad baja";
+  if (score == null) return "Not measured yet";
+  if (score >= 67) return "Good visibility";
+  if (score >= 34) return "Medium visibility";
+  return "Low visibility";
 }
 
 function suggestKeywords(niche) {
@@ -326,45 +326,45 @@ function suggestKeywords(niche) {
 function improvementPlan(score) {
   const base = [
     {
-      title: "Enriquece tus descripciones de producto",
+      title: "Enrich your product descriptions",
       detail:
-        "Incluye los términos exactos que la gente le pregunta a la IA: para qué sirve, beneficios y “para [necesidad]”. La IA recomienda lo que entiende.",
+        "Use the exact terms people ask AI about: what it's for, benefits, and “for [need]”. AI recommends what it understands.",
     },
     {
-      title: "Consigue reseñas y menciones en otros sitios",
+      title: "Get reviews and mentions on other sites",
       detail:
-        "La IA confía mucho en Reddit, blogs y YouTube. Pide reseñas y busca aparecer en listas tipo “mejores [tu producto]”.",
+        "AI leans heavily on Reddit, blogs and YouTube. Ask for reviews and aim to appear in “best [your product]” lists.",
     },
     {
-      title: "Crea contenido que responda preguntas de compra",
+      title: "Create content that answers buying questions",
       detail:
-        "Publica en tu blog respuestas a “mejor X para Y”. Es justo lo que la IA cita al recomendar.",
+        "Publish answers to “best X for Y” on your blog. That's exactly what AI cites when recommending.",
     },
     {
-      title: "Revisa tus datos estructurados",
+      title: "Check your structured data",
       detail:
-        "Asegúrate de que tus productos tengan título, precio, marca y reseñas bien definidos (Shopify genera parte automáticamente).",
+        "Make sure your products have a clear title, price, brand and reviews (Shopify generates some automatically).",
     },
   ];
 
   if (score == null)
-    return { tone: "neutral", intro: "Corre un análisis para ver recomendaciones.", actions: [] };
+    return { tone: "neutral", intro: "Run an analysis to see recommendations.", actions: [] };
   if (score < 34)
     return {
       tone: "critical",
       intro:
-        "La IA casi no te menciona. Lo prioritario es empezar a aparecer frente a tu competencia.",
+        "AI barely mentions you. The priority is to start showing up against your competitors.",
       actions: base,
     };
   if (score < 67)
     return {
       tone: "warning",
-      intro: "Vas por buen camino, pero puedes subir de posición.",
+      intro: "You're on the right track, but you can climb higher.",
       actions: base,
     };
   return {
     tone: "success",
-    intro: "¡Buena visibilidad! Mantén el ritmo y vigila a tu competencia.",
+    intro: "Great visibility! Keep it up and keep an eye on your competitors.",
     actions: base.slice(0, 2),
   };
 }
@@ -416,7 +416,7 @@ function ScoreGauge({ score }) {
         {score != null ? score : "—"}
       </text>
       <text x="50%" y="64%" textAnchor="middle" fontSize="14" fill="#6D7175">
-        de 100
+        of 100
       </text>
     </svg>
   );
@@ -425,7 +425,7 @@ function ScoreGauge({ score }) {
 // Smooth area + line chart for the score trend over time.
 function TrendChart({ points }) {
   if (!points.length) {
-    return <s-paragraph tone="subdued">Aún no hay análisis.</s-paragraph>;
+    return <s-paragraph tone="subdued">No analyses yet.</s-paragraph>;
   }
   const w = 560;
   const h = 200;
@@ -462,7 +462,7 @@ function ShareChart({ rows }) {
   if (!rows.length) {
     return (
       <s-paragraph tone="subdued">
-        Corre un análisis para ver cuánto apareces frente a tu competencia.
+        Run an analysis to see how you stack up against your competitors.
       </s-paragraph>
     );
   }
@@ -479,7 +479,7 @@ function ShareChart({ rows }) {
             }}
           >
             <span style={{ fontWeight: r.isBrand ? 700 : 400 }}>
-              {r.isBrand ? `★ ${r.name} (tú)` : r.name}
+              {r.isBrand ? `★ ${r.name} (you)` : r.name}
             </span>
             <span style={{ color: "#6D7175" }}>{r.count}</span>
           </div>
@@ -533,11 +533,11 @@ export default function Index() {
   }, [data.checksCount, data.hasApiKey, data.configured, data.engine, fetcher]);
 
   useEffect(() => {
-    if (fetcher.data?.saved) shopify.toast.show("Guardado ✓");
+    if (fetcher.data?.saved) shopify.toast.show("Saved ✓");
     if (fetcher.data?.ran)
-      shopify.toast.show(`Análisis listo: ${fetcher.data.score}/100`);
+      shopify.toast.show(`Analysis ready: ${fetcher.data.score}/100`);
     if (fetcher.data?.autofill)
-      shopify.toast.show("Autocompletado desde tu tienda ✓");
+      shopify.toast.show("Auto-filled from your store ✓");
     if (fetcher.data?.error)
       shopify.toast.show(fetcher.data.error, { isError: true });
   }, [fetcher.data, shopify]);
@@ -577,13 +577,13 @@ export default function Index() {
       : null;
 
   return (
-    <s-page heading="Surfaced — Visibilidad en IA">
+    <s-page heading="Surfaced — AI Visibility">
       <s-button
         slot="primary-action"
         onClick={analyze}
         {...(analyzing ? { loading: true } : {})}
       >
-        Actualizar análisis
+        Run analysis
       </s-button>
 
       {isDemo && (
@@ -595,16 +595,15 @@ export default function Index() {
             background="subdued"
           >
             <s-text tone="subdued">
-              🧪 Estás viendo <s-text fontWeight="bold">datos de ejemplo</s-text>.
-              Conecta una API key (Perplexity u OpenAI) para medir tu visibilidad
-              real en la IA.
+              🧪 You're viewing <s-text fontWeight="bold">sample data</s-text>.
+              Connect an API key to measure your real visibility in AI.
             </s-text>
           </s-box>
         </s-section>
       )}
 
-      {/* ── Hero: medidor + resumen ───────────────────────────────────── */}
-      <s-section heading={`Visibilidad de ${data.brandName || "tu tienda"} en la IA`}>
+      {/* ── Hero: gauge + summary ─────────────────────────────────────── */}
+      <s-section heading={`How ${data.brandName || "your store"} shows up in AI`}>
         <s-stack direction="inline" gap="large" alignItems="center">
           <ScoreGauge score={score} />
           <s-stack direction="block" gap="base">
@@ -612,56 +611,56 @@ export default function Index() {
               <s-badge tone={scoreTone(score)}>{statusLabel(score)}</s-badge>
               {delta != null && (
                 <s-text tone={delta >= 0 ? "success" : "critical"}>
-                  {delta >= 0 ? "▲" : "▼"} {Math.abs(delta)} vs. análisis anterior
+                  {delta >= 0 ? "▲" : "▼"} {Math.abs(delta)} vs. last analysis
                 </s-text>
               )}
             </s-stack>
             {totalKw > 0 ? (
               <s-paragraph>
-                La IA te recomienda en{" "}
+                AI recommends you in{" "}
                 <s-text fontWeight="bold">
-                  {covered} de {totalKw}
+                  {covered} of {totalKw}
                 </s-text>{" "}
-                búsquedas de tu nicho.
+                searches in your niche.
               </s-paragraph>
             ) : (
               <s-paragraph>
-                Mide qué tan seguido la IA recomienda tu tienda cuando alguien
-                busca productos como los tuyos.
+                Measures how often AI recommends your store when someone searches
+                for products like yours.
               </s-paragraph>
             )}
             {data.latestRunAt && (
               <s-text tone="subdued">
-                Último análisis: {new Date(data.latestRunAt).toLocaleString()} ·
-                motor {data.latestEngine}
+                Last analysis: {new Date(data.latestRunAt).toLocaleString()} ·
+                engine {data.latestEngine}
               </s-text>
             )}
             {data.latestEngine === "deepseek" && (
               <s-text tone="subdued">
-                DeepSeek responde desde su conocimiento (sin búsqueda web en
-                vivo). Suma Perplexity para medir la búsqueda en tiempo real.
+                DeepSeek answers from its training knowledge (no live web
+                search). Add Perplexity to measure real-time search.
               </s-text>
             )}
           </s-stack>
         </s-stack>
       </s-section>
 
-      {/* ── Gráfica de tendencia ──────────────────────────────────────── */}
-      <s-section heading="Tendencia de tu visibilidad">
+      {/* ── Trend chart ───────────────────────────────────────────────── */}
+      <s-section heading="Your visibility trend">
         <TrendChart points={data.trend} />
         <s-text tone="subdued">
-          Cada punto es un análisis. La línea sube cuando la IA te recomienda
-          más seguido.
+          Each point is one analysis. The line rises as AI recommends you more
+          often.
         </s-text>
       </s-section>
 
       {/* ── Share of voice ────────────────────────────────────────────── */}
-      <s-section heading="Tú vs. tu competencia (share of voice)">
+      <s-section heading="You vs. your competitors (share of voice)">
         <ShareChart rows={data.shareOfVoice} />
       </s-section>
 
-      {/* ── Cómo mejorar ──────────────────────────────────────────────── */}
-      <s-section heading="Cómo mejorar tu visibilidad">
+      {/* ── How to improve ────────────────────────────────────────────── */}
+      <s-section heading="How to improve your visibility">
         <s-stack direction="block" gap="base">
           <s-badge tone={plan.tone}>{statusLabel(score)}</s-badge>
           <s-paragraph>{plan.intro}</s-paragraph>
@@ -675,7 +674,7 @@ export default function Index() {
             >
               <s-stack direction="block" gap="tight">
                 <s-text fontWeight="bold">
-                  Búsquedas donde NO apareces (tus oportunidades):
+                  Searches where you DON'T appear (your opportunities):
                 </s-text>
                 <s-unordered-list>
                   {data.missingKeywords.map((kw, i) => (
@@ -683,8 +682,7 @@ export default function Index() {
                   ))}
                 </s-unordered-list>
                 <s-text tone="subdued">
-                  Enfoca contenido y reseñas en estas preguntas para empezar a
-                  aparecer.
+                  Focus content and reviews on these queries to start showing up.
                 </s-text>
               </s-stack>
             </s-box>
@@ -692,7 +690,7 @@ export default function Index() {
 
           {plan.actions.length > 0 && (
             <s-stack direction="block" gap="base">
-              <s-text fontWeight="bold">Acciones recomendadas:</s-text>
+              <s-text fontWeight="bold">Recommended actions:</s-text>
               {plan.actions.map((a, i) => (
                 <s-stack key={i} direction="block" gap="none">
                   <s-text fontWeight="bold">
@@ -707,55 +705,55 @@ export default function Index() {
       </s-section>
 
       {/* ── ROI ───────────────────────────────────────────────────────── */}
-      <s-section heading="Ventas atribuidas a IA">
+      <s-section heading="Sales attributed to AI">
         <s-stack direction="inline" gap="large">
           <s-box padding="large" borderWidth="base" borderRadius="base" background="subdued">
             <s-stack direction="block" gap="none">
               <s-text variant="headingLg">{data.aiOrders}</s-text>
-              <s-text tone="subdued">pedidos desde IA</s-text>
+              <s-text tone="subdued">orders from AI</s-text>
             </s-stack>
           </s-box>
           <s-box padding="large" borderWidth="base" borderRadius="base" background="subdued">
             <s-stack direction="block" gap="none">
               <s-text variant="headingLg">${data.aiRevenue.toFixed(2)}</s-text>
-              <s-text tone="subdued">ingresos desde IA</s-text>
+              <s-text tone="subdued">revenue from AI</s-text>
             </s-stack>
           </s-box>
         </s-stack>
       </s-section>
 
-      {/* ── Ajustes (opcional, colapsado) ─────────────────────────────── */}
-      <s-section heading="Ajustes (opcional)">
+      {/* ── Settings (optional, collapsed) ────────────────────────────── */}
+      <s-section heading="Settings (optional)">
         <s-paragraph tone="subdued">
-          Configuramos esto automáticamente desde tu tienda. Ábrelo solo si
-          quieres afinar la marca, el nicho, los competidores o las keywords.
+          We set this up automatically from your store. Open it only if you want
+          to fine-tune your brand, niche, competitors or keywords.
         </s-paragraph>
         <s-button onClick={() => setShowSettings((v) => !v)}>
-          {showSettings ? "Ocultar configuración" : "Editar configuración"}
+          {showSettings ? "Hide settings" : "Edit settings"}
         </s-button>
 
         {showSettings && (
           <s-stack direction="block" gap="base">
             <s-button onClick={autofill} {...(autofilling ? { loading: true } : {})}>
-              Volver a autocompletar desde mi tienda
+              Re-fill from my store
             </s-button>
             <s-text-field
-              label="Nombre de tu marca"
+              label="Your brand name"
               value={brandName}
               onChange={(e) => setBrandName(e.target.value)}
             />
             <s-text-field
-              label="Nicho"
+              label="Niche"
               value={niche}
               onChange={(e) => setNiche(e.target.value)}
             />
             <s-text-area
-              label="Competidores (una marca por línea)"
+              label="Competitors (one brand per line)"
               value={competitors}
               onChange={(e) => setCompetitors(e.target.value)}
             />
             <s-text-area
-              label="Keywords (una pregunta por línea)"
+              label="Keywords (one question per line)"
               value={keywords}
               onChange={(e) => setKeywords(e.target.value)}
             />
@@ -764,27 +762,25 @@ export default function Index() {
                 onClick={() => setKeywords(suggestKeywords(niche).join("\n"))}
                 {...(niche.trim() ? {} : { disabled: true })}
               >
-                Sugerir keywords
+                Suggest keywords
               </s-button>
               <s-button variant="primary" onClick={save} {...(saving ? { loading: true } : {})}>
-                Guardar
+                Save
               </s-button>
             </s-stack>
           </s-stack>
         )}
       </s-section>
 
-      {/* ── Histórico ─────────────────────────────────────────────────── */}
-      <s-section slot="aside" heading="Cómo funciona">
+      {/* ── How it works (aside) ──────────────────────────────────────── */}
+      <s-section slot="aside" heading="How it works">
         <s-ordered-list>
-          <s-list-item>Leemos tu tienda y la configuramos sola.</s-list-item>
+          <s-list-item>We read your store and set it up for you.</s-list-item>
+          <s-list-item>We ask AI about products like yours.</s-list-item>
           <s-list-item>
-            Le preguntamos a la IA por productos como los tuyos.
+            We measure if it recommends you and give you a 0–100 score.
           </s-list-item>
-          <s-list-item>
-            Medimos si te recomienda y te damos un puntaje 0–100.
-          </s-list-item>
-          <s-list-item>Repítelo y verás tu tendencia en el tiempo.</s-list-item>
+          <s-list-item>Run it again to see your trend over time.</s-list-item>
         </s-ordered-list>
       </s-section>
     </s-page>
